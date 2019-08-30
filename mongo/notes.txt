@@ -1,0 +1,33 @@
+Worked with Pacman with only minor changes:
+
+In pacman federateddeployment, change:
+
+MONGO_SERVICE_HOST to match monto service endpoints: SEE BELOW
+MONGO_PORT back to default mongo tcp/ip port of 27017
+MONGO_USE_SSL to false
+
+
+Had to change hostnames to match internal endpoints, but with namespace added,
+
+Looks like: service.namespace e.g.
+
+    mongo-svc-a.sku-mongo,mongo-svc-b.sku-mongo,mongo-svc-c.sku-mongo
+
+After changing pacman's endpoints, found pacman still got unnamespaced hosts
+out of the MongoDB replicaset, so had to change those hostnames too:
+
+Useful info on changing RS in flight:
+    https://docs.mongodb.com/manual/tutorial/change-hostnames-in-a-replica-set/#replica-set-change-hostname-no-downtime
+
+Finally, I had to create a user (inky:clyde) and a database (pacman) for access to work appropriately:
+
+I found simple instructions here: https://zocada.com/setting-mongodb-users-beginners-guide/
+
+    use pacman
+    db.createUser(
+      {
+        user: "inky",
+        pwd: "clyde",
+        roles: [ { role: "readWrite", db: "pacman" } ]
+      }
+    )
