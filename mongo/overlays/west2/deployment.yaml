@@ -1,0 +1,30 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata: 
+  name: tcp-mongo-c
+spec:
+  replicas: 1
+  selectors:
+    matchLabels:
+      application: tcp-mongo-c
+  template:
+    metadata:
+      labels:
+        application: tcp-mongo-c
+    spec:
+      containers: 
+        - image: mongo
+          name: mongo-c
+          command:
+            - mongod
+            - "--replSet"
+            - rs0
+            - "--bind_ip_all"
+          imagePullPolicy: IfNotPresent
+          volumeMounts: 
+            - mountPath: /data/db
+              name: mongodb-data
+      volumes: 
+        - name: mongodb-data
+          emptyDir: {}
