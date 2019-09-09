@@ -5,9 +5,6 @@ metadata:
   name: tcp-mongo-a
 spec:
   replicas: 1
-  selectors:
-    matchLabels:
-      application: tcp-mongo-a
   template:
     metadata:
       labels:
