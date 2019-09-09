@@ -31,3 +31,8 @@ I found simple instructions here: https://zocada.com/setting-mongodb-users-begin
         roles: [ { role: "readWrite", db: "pacman" } ]
       }
     )
+
+## Adding argocd integration
+Holed up in RHSyseng because we can create private repos here
+
+Creating private ssh key for github to allow access by argocd over ssh
