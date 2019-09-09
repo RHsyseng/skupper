@@ -3,3 +3,5 @@ resources:
 - deployment.yaml
 - secret.yaml
 - service.yaml
+- accounts.yaml
+- proxies.yaml
