@@ -15,7 +15,7 @@ metadata:
           # Single member MongoDB
           # value: primarymongohere
           # Replicaset (federated) MongoDB
-          value: replicamembershere
+          value: mongo-svc-a.sku-mongo,mongo-svc-b.sku-mongo,mongo-svc-c.sku-mongo
           # Comment out MONGO_REPLICA_SET for the single-member Mongo
         - name: MONGO_REPLICA_SET
           value: rs0
@@ -32,10 +32,8 @@ metadata:
         - name: MONGO_DATABASE
           value: pacman
         - name: MY_MONGO_PORT
-          value: "443"
+          value: "27017"
         - name: MONGO_USE_SSL
-          value: "true"
-        - name: MONGO_VALIDATE_SSL
           value: "false"
         - name: MY_NODE_NAME
           valueFrom:
