@@ -5,10 +5,14 @@ metadata:
   labels:
     name: pacman
 spec:
+  replicas: 1
   selector:
     matchLabels:
       name: pacman
   template:
+    metadata:
+      labels:
+        name: pacman
     spec:
       serviceAccount: pacman
       containers:
