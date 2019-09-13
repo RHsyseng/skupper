@@ -1,4 +1,8 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy
+  namespace: sku-pacman
 data:
   haproxy: "#---------------------------------------------------------------------\n#
     Example configuration for a possible web application.  See the\n# full configuration
@@ -31,11 +35,3 @@ data:
     \   mode http \n        server east1 skuppman.apps.east-1.sysdeseng.com:80 check\n
     \       server east2 skuppman.apps.east-2.sysdeseng.com:80 check\n        server
     west2 skuppman.apps.west-1.sysdeseng.com:80 check\n\n"
-kind: ConfigMap
-metadata:
-  creationTimestamp: "2019-09-13T17:45:09Z"
-  name: haproxy
-  namespace: sku-pacman
-  resourceVersion: "4771610"
-  selfLink: /api/v1/namespaces/sku-pacman/configmaps/haproxy
-  uid: 3aa498aa-d64e-11e9-8433-0e7cd160f656
