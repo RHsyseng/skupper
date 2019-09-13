@@ -2,7 +2,7 @@ resources:
 - mongodb-users-secret.yaml
 - namespace.yaml
 - pacman-deployment.yaml
-- skuppman-ingress.yaml
+- skuppman-route.yaml
 - pacman-serviceaccount.yaml
 - pacman-service.yaml
 - skuppman-clusterrolebinding.yaml
