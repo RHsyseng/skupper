@@ -19,15 +19,15 @@ out of the MongoDB replicaset, so had to change those hostnames too:
 Useful info on changing RS in flight:
     https://docs.mongodb.com/manual/tutorial/change-hostnames-in-a-replica-set/#replica-set-change-hostname-no-downtime
 
-Finally, I had to create a user (inky:clyde) and a database (pacman) for access to work appropriately:
+Finally, I had to create a user (blinky:pinky) and a database (pacman) for access to work appropriately:
 
 I found simple instructions here: https://zocada.com/setting-mongodb-users-beginners-guide/
 
     use pacman
     db.createUser(
       {
-        user: "inky",
-        pwd: "clyde",
+        user: "blinky",
+        pwd: "pinky",
         roles: [ { role: "readWrite", db: "pacman" } ]
       }
     )
