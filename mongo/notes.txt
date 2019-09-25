@@ -41,9 +41,8 @@ Creating private ssh key for github to allow access by argocd over ssh
 Many charts and other distribution techniques provide a single yaml file with
 multiple resources defined. To divide these files by the --- separator, use the Gnu csplit utility:
 
-'''
-csplit -p 'prefix-text' -f 'suffix-%02d.yaml' combined-resources.yaml '/^---$/' '{*}'
-'''
+    csplit --prefix 'prefix-text' --suffix 'suffix-%02d.yaml' \
+        combined-resources.yaml '/^---$/' '{*}'
 
 If you have a different set of yaml per cluster, and want to find similarities, it is now easy
 with md5sum or any other hashing function:
