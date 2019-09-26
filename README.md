@@ -55,8 +55,8 @@ file on standard out:
     cat network.conf | docker run -i quay.io/skupper/skoot | tar --extract
 
 The above command will create a directory `yaml` with files corresponding to resources to be created on each cluster
-for the routers. Each file contains several (five in our example) resources. You can see what kind of files exist in 
-each cluster's config with grep:
+for the routers. Each file contains several (five in our example) resources. You can see what kind of resources exist in 
+each cluster's yaml with grep:
 
     grep ^kind yaml/east-1.yaml 
     
@@ -70,7 +70,7 @@ Before proceeding with adding these resources to the clusters or to Argo CD, sta
 be maintained in.
 
 ### Create Kustomize Directory Structure
-Create a Git repository (preferably private) with the following directory layout:
+Next we will create a Git repository (preferably private) following the following directory layout:
 
     .
     ├── application1            # Group applications separately, e.g. database, front end
@@ -162,9 +162,55 @@ Removing the duplicates in the `east-*` clusters:
 
     rm mongo/overlays/east-?/0{2,3}.yaml
 
+We are left with Secrets in `00.yaml`, ConfigMaps in `01.yaml`, and Routes in `04.yaml` so we can clean up the file
+names with a quick for loop:
 
+    for cluster in east-1 east-2 west-2
+    do
+        d=mongo/overlays/${cluster}
+        mv $d/00.yaml $d/secret.yaml
+        mv $d/01.yaml $d/configmap.yaml
+        mv $d/04.yaml $d/route.yaml
+    done
 
+```
+mongo
+├── base
+│   ├── deployment.yaml
+│   └── service.yaml
+└── overlays
+    ├── east-1
+    │   ├── configmap.yaml
+    │   ├── route.yaml
+    │   └── secret.yaml
+    ├── east-2
+    │   ├── configmap.yaml
+    │   ├── route.yaml
+    │   └── secret.yaml
+    └── west-2
+        ├── configmap.yaml
+        ├── route.yaml
+        └── secret.yaml
+```
 
+The next step is to add `kustomization.yaml` files to direct ArgoCD to the content. Create the following under
+`mongo/base/kustomization.yaml`
+
+```yaml
+resources:
+- deployment.yaml
+- service.yaml
+```
+
+In each of the overlays/cluster directories, create another `kustomization.yaml` with the following content:
+
+```
+resources:
+- ../../base
+- configmap.yaml
+- secret.yaml
+- route.yaml
+```
 
 ### Create ArgoCD Application
 
