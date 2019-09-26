@@ -29,11 +29,11 @@ The process for using skoot goes like this:
 
 The `network.conf` looks like a simplified version of the Apache Qpid dispatch router [qdrouter.conf](http://qpid.apache.org/releases/qpid-dispatch-1.9.0/man/qdrouterd.conf.html). Directives in the file include:
 
-(Router|EdgeRouter) <cluster> <hostname>
+    (Router|EdgeRouter) <cluster> <hostname>
 
-Connect <cluster1> <cluster2>
+    Connect <cluster1> <cluster2>
 
-Console <cluster> <hostname>
+    Console <cluster> <hostname>
 
 For example, to connect three public clusters, east-1, east-2, and west-2:
 
