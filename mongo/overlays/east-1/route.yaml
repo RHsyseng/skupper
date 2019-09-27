@@ -15,3 +15,8 @@ spec:
     name: messaging
     weight: 100
   wildcardPolicy: None
+status:
+  ingress:
+  - conditions:
+    - status: 'True'
+      type: Admitted
