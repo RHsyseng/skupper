@@ -1,12 +1,9 @@
 ---
-kind: ConfigMap
-metadata:
-  name: qdr-config
 apiVersion: v1
 data:
   qdrouterd.conf: |
     router {
-       id:east-1
+       id:east-2
        mode: interior
     }
 
@@ -36,16 +33,6 @@ data:
     }
 
     connector {
-       name: to_east-2
-       host: inter-router.sku-mongo.apps.east-2.sysdeseng.com
-       port: 443
-       saslMechanisms: EXTERNAL
-       sslProfile: ssl-profile
-       verifyHostname: no
-       role: inter-router
-    }
-
-    connector {
        name: to_west-2
        host: inter-router.sku-mongo.apps.west-2.sysdeseng.com
        port: 443
@@ -53,6 +40,15 @@ data:
        sslProfile: ssl-profile
        verifyHostname: no
        role: inter-router
+    }
+
+    listener {
+       sslProfile: ssl-profile
+       role: inter-router
+       host: 0.0.0.0
+       port: 55672
+       saslMechanisms: EXTERNAL
+       authenticatePeer:yes
     }
 
     address {
@@ -64,3 +60,7 @@ data:
        prefix: multicast
        distribution: multicast
     }
+
+kind: ConfigMap
+metadata:
+  name: qdr-config

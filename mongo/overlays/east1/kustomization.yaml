@@ -1,7 +1,0 @@
-resources:
-- ../../base
-- route.yaml
-- configmap.yaml
-- deployment.yaml
-patchesStrategicMerge:
-- secret.yaml
