@@ -2,7 +2,7 @@
 
 [Skupper MongoDB Multi-Cluster RS](https://github.com/skupperproject/skupper-example-mongodb-replica-set)
 
-[ArgoCD GitOps](https://argoproj.github.io/argo-cd)
+[Argo CD GitOps](https://argoproj.github.io/argo-cd)
 
 and 
 
@@ -86,9 +86,9 @@ Next we will create a Git repository (preferably private) following the followin
             ├── cluster2        # Customizations for cluster2
             └── clusterN        # Customizations for clusterN
 
-Using Kustomize and ArgoCD together allows for the reuse of similar bits of code.
+Using Kustomize and Argo CD together allows for the reuse of similar bits of code.
 Now is a good time to break up the previously created skoot yaml files into
-individual files for adding to ArgoCD.
+individual files for adding to Argo CD.
 
 For this example, create applications `mongo` and `pacman`. The skupper router
 and content will go in the mongo application.
@@ -162,6 +162,8 @@ Removing the duplicates in the `east-*` clusters:
 
     rm mongo/overlays/east-?/0{2,3}.yaml
 
+### Find Unique Configurations for Overrides
+
 We are left with Secrets in `00.yaml`, ConfigMaps in `01.yaml`, and Routes in `04.yaml` so we can clean up the file
 names with a quick for loop:
 
@@ -173,11 +175,41 @@ names with a quick for loop:
         mv $d/04.yaml $d/route.yaml
     done
 
+Looking more closely at the secret, we see that it has a common field for all clusters, `ca.crt`
+
+```
+sdiff -w 100 mongo/overlays/east-*/secret.yaml
+
+apiVersion: v1                                  apiVersion: v1
+data:                                           data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS |   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS
+  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRV |   tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRV
+  tls.pw: ZWFzdC0xLXBhc3N3b3JkCg==            |   tls.pw: ZWFzdC0yLXBhc3N3b3JkCg==
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0     ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0
+kind: Secret                                    kind: Secret
+metadata:                                       metadata:
+  name: qdr-internal-cert                         name: qdr-internal-cert
+type: kubernetes.io/tls                         type: kubernetes.io/tls
+
+```
+
+Normally we would not bother over the duplication of a single ca certificate, but this is a good point to 
+demonstrate a useful feature of kustomize, the strategic merge patch. Start by making a copy of the secret in base:
+
+    cp mongo/overlays/east-1/secret.yaml mongo/base
+
+Edit the base secret, removing the tls.crt, tls.key, and tls.pw lines which are unique per cluster.
+
+Edit each overlay's secret.yaml, removing the ca.crt field which is common to all.
+
+The mongo directory structure should now look as so:
+
 ```
 mongo
 ├── base
 │   ├── deployment.yaml
 │   └── service.yaml
+│   └── secret.yaml
 └── overlays
     ├── east-1
     │   ├── configmap.yaml
@@ -193,26 +225,161 @@ mongo
         └── secret.yaml
 ```
 
-The next step is to add `kustomization.yaml` files to direct ArgoCD to the content. Create the following under
+The next step is to add `kustomization.yaml` files to direct Argo CD to the content. Create the following under
 `mongo/base/kustomization.yaml`
 
 ```yaml
 resources:
 - deployment.yaml
 - service.yaml
+- secret.yaml
 ```
 
-In each of the overlays/cluster directories, create another `kustomization.yaml` with the following content:
+In each of the overlays/cluster directories, create another `kustomization.yaml` with the following content; note the patchesStrategicMerge line which applies the overlay secret.yaml as a merge edit of the one in base:
 
 ```
 resources:
 - ../../base
 - configmap.yaml
-- secret.yaml
 - route.yaml
+patchesStrategicMerge:
+- secret.yaml
 ```
 
-### Create ArgoCD Application
+The final step before moving on to Argo CD is to commit all this code to the Git repo.
 
+    git add mongo
+    git commit -m 'Initial skupper resources'
+    git push
 
-### Find Unique Configurations for Overrides
+### Create Argo CD Application
+
+First, make sure you have a matching command line interface for your server version of Argo CD and log in to the server
+
+    argocd login argocd-server-route-argocd.apps.example.com --insecure --grpc-web
+
+Add the newly created repository to Argo CD.
+
+    argocd repo add https://github.com/your_org/your_repo
+
+    argocd app create --project default \
+    --name skuppman-db-c1 \
+    --repo https://github.com/your_org/your_repo \
+    --dest-namespace skuppman-db \
+    --revision master \
+    --sync-policy none \
+    --path mongo/overlays/east-1 \
+    --dest-server https://kubernetes.default.svc
+
+Note the app we just added is set to the "none' sync policy which requires
+manual intervention to sync. We will now try to sync the app:
+
+```
+argocd app sync skuppman-db-c1
+
+Name:               skuppman-db-c1
+Project:            default
+Server:             https://kubernetes.default.svc
+Namespace:          skuppman-db
+URL:                https://argocd-server-route-argocd.apps.east-1.example.com/applications/skuppman-db-c1
+Repo:               git@github.com:RHsyseng/skupper.git
+Target:             master
+Path:               mongo/overlays/east-1
+Sync Policy:        <none>
+Sync Status:        OutOfSync from master (8e35460)
+Health Status:      Missing
+
+Operation:          Sync
+Sync Revision:      8e35460a5211fba6901d3ab18c0cd96ba52a78f3
+Phase:              Failed
+Start:              2019-09-27 13:46:59 -0500 CDT
+Finished:           2019-09-27 13:47:01 -0500 CDT
+Duration:           2s
+Message:            one or more objects failed to apply (dry run)
+
+GROUP               KIND        NAMESPACE    NAME               STATUS     HEALTH   HOOK  MESSAGE
+route.openshift.io  Route       skuppman-db  console            OutOfSync  Missing        kubectl failed exit status 1: error validating data: ValidationError(Route): missing required field "status" in com.github.openshift.api.route.v1.Route
+                    ConfigMap   skuppman-db  qdr-config         OutOfSync  Missing        
+                    Secret      skuppman-db  qdr-internal-cert  OutOfSync  Missing        
+                    Service     skuppman-db  messaging          OutOfSync  Missing        
+extensions          Deployment  skuppman-db  qdrouterd          OutOfSync  Missing        
+```
+
+From the output, no objects were able to sync and there was at least one error regarding the format of the Route object.
+It turns out that the first problem is that the namespace into which Argo CD tries to create resources does not exist.
+That should be easy to fix, use `oc` to create the namespace, export to yaml, and add it to the repo:
+
+    oc create ns skuppman-db -o yaml > mongo/base/namespace.yaml
+    echo "- namespace.yaml" >> mongo/base/kustomization.yaml
+    git add mongo/base
+    git commit -m 'added namespace'
+
+To fix the Route object, it appears a status field is required. In testing, we found the following works best:
+
+```
+status:
+  ingress:
+  - conditions:
+    - status: 'True'
+      type: Admitted
+```
+
+Add the above to the route objects, check them in to the repo and re-run the sync:
+
+    argocd app sync skuppman-db-c1
+    
+    ...
+    Sync Status:        OutOfSync from master (e3da7f7)
+    Health Status:      Healthy
+
+The Healthy status is an improvement, but we are still getting OutOfSync errors. It turns out that some annotations
+created by `oc` in the namespace do not always sync up. Edit the namespace.yaml to pare it down to a more basic
+config by eliminating the extra fields not required to create a namespace:
+
+```
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: skuppman-db
+  selfLink: /api/v1/namespaces/skuppman-db
+```
+
+Commit and sync again, and there is only one object still refusing to sync, and
+it's our Route again. To debug what is going on, use the argocd diff command:
+
+```
+argocd app diff skuppman-db-c1
+
+===== route.openshift.io/Route skuppman-db/console ======
+14c14
+<   selfLink: /apis/route.openshift.io/v1/namespaces/skuppman-db/routes/console
+---
+>   selfLink: /apis/route.openshift.io/v1/namespaces/hello/routes/console
+```
+
+It looks like skoot assumed a namespace when creating its objects, let us remove the selfLink field from each route.
+
+    sed -i '/selfLink:/d' mongo/overlays/*/route.yaml
+    git add mongo/overlays
+    git commit -m 'removed selfLink lines'
+    git push
+    argocd app sync skuppman-db-c1
+    
+
+### Create Mongo Database
+
+The next step is to create the MongoDB resources. For this, we borrow from the
+[Skupper MongoDB Replica Set Demo](https://github.com/skupperproject/skupper-example-mongodb-replica-set)
+
+    for i in a b c
+    do
+        curl -qO https://raw.githubusercontent.com/skupperproject/skupper-example-mongodb-replica-set/master/deployment-mongo-svc-${i}.yaml
+    done
+
+Again, there is one file for each cluster, but as their differences include the resource names, we cannot use strategic merge patches to reuse code. Instead, copy each one into its relevant overlay directory:
+
+    mv deployment-mongo-svc-a.yaml mongo/overlays/east-1
+    mv deployment-mongo-svc-b.yaml mongo/overlays/east-2
+    mv deployment-mongo-svc-c.yaml mongo/overlays/west-2
+
+Add the relevant line to each `kustomization.yaml` to start pushing the new file and sync.
