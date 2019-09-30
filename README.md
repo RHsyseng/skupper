@@ -427,3 +427,31 @@ Again, there is one file for each cluster, but as their differences include the 
 
 Add the relevant line to each `kustomization.yaml` to start pushing the new file and sync.
 
+Once there are mongodb pods running on all three clusters, there is some manual database administration
+to be done to set up the replica set and to create the database and user for the pacman application.
+
+To start, find the pod name of the first cluster's mongodb pod:
+
+    oc -n skuppman-db get pods
+    
+    NAME                        READY   STATUS    RESTARTS   AGE
+    mongo-a-6d75dd6774-jlz6q    1/1     Running   0          118m
+    qdrouterd-fc44ccddc-qtthl   1/1     Running   1          2d23h
+
+In this case, we want `mongo-a-6d75dd6774-jlz6q`. Now run an interactive mongo shell on that pod:
+
+    oc -n skuppman-db exec -ti mongo-a-6d75dd6774-jlz6q -- mongo
+
+Paste in the following code
+
+```
+rs.initiate( {
+    _id : "rs0",
+    members: [
+        { _id: 0, host: "mongo-svc-a.skuppman-db:27017" },
+        { _id: 1, host: "mongo-svc-b.skuppman-db:27017" },
+        { _id: 2, host: "mongo-svc-c.skuppman-db:27017" }
+    ]
+})
+```
+
