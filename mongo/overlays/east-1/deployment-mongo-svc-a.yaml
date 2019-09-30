@@ -1,0 +1,39 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata: 
+  name: mongo-a
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        application: mongo-a
+    spec:
+      containers: 
+        - image: mongo
+          name: mongo-a
+          command:
+            - mongod
+            - "--replSet"
+            - rs0
+            - "--bind_ip_all"
+          imagePullPolicy: IfNotPresent
+          volumeMounts: 
+            - mountPath: /data/db
+              name: mongodb-data
+      volumes: 
+        - name: mongodb-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-svc-a
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  selector:
+    application: mongo-a
+---
