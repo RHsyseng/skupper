@@ -365,6 +365,49 @@ It looks like skoot assumed a namespace when creating its objects, let us remove
     git push
     argocd app sync skuppman-db-c1
     
+The application should be syncing cleanly and show as "Healthy" and "Synced". Before continuing, add applications
+for the remaining two clusters:
+
+    argocd app create --project default \
+    --name skuppman-db-c2 \
+    --repo https://github.com/your_org/your_repo \
+    --dest-namespace skuppman-db \
+    --revision master \
+    --sync-policy none \
+    --path mongo/overlays/east-2 \
+    --dest-server https://api.east-2.example.com:6443 
+    
+    argocd app create --project default \
+    --name skuppman-db-c3 \
+    --repo https://github.com/your_org/your_repo \
+    --dest-namespace skuppman-db \
+    --revision master \
+    --sync-policy none \
+    --path mongo/overlays/west-2 \
+    --dest-server https://api.west-2.example.com:6443 
+
+On syncing the new clusters, we find one more issue, due to a bug in the Route object creation by skoot:
+
+    argocd app sync skuppman-db-c3
+
+    <OUTPUT SKIPPED>
+
+    GROUP       KIND        NAMESPACE    NAME               STATUS     HEALTH   HOOK  MESSAGE
+    Route       skuppman-db  amqps              OutOfSync  Missing        Route "" not found
+
+Looking at the working route in east-1, we see the apiVersion is
+`route.openshift.io/v1` while the other clusters use `v1`. The latter, if
+created with `oc` would work by automatically adjusting the actual resource
+apiVersion, but as Argo CD is stricter, it rejects the resource, correctly
+explaining that there is no Route resource in /v1 of the api. Change both
+routes to the correct apiVersion, commit and push the git repo, then run
+`argocd sync` again.
+
+    sed -i 's@v1@route.openshift.io/v1@' mongo/overlays/????-2/route.yaml
+    git commit -m 'Fixed apiVersion' mongo/overlays/*/route.yaml
+    git push
+    argocd app sync skuppman-db-c2
+    argocd app sync skuppman-db-c3
 
 ### Create Mongo Database
 
@@ -383,3 +426,4 @@ Again, there is one file for each cluster, but as their differences include the 
     mv deployment-mongo-svc-c.yaml mongo/overlays/west-2
 
 Add the relevant line to each `kustomization.yaml` to start pushing the new file and sync.
+
