@@ -1,7 +1,0 @@
-resources:
-- ../../base
-- configmap.yaml
-- route.yaml
-- deployment-mongo-svc-b.yaml
-patchesStrategicMerge:
-- secret.yaml
