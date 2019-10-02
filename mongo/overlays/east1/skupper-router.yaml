@@ -1,0 +1,166 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+  creationTimestamp: null
+  generation: 1
+  name: skupper-router
+  selfLink: /apis/extensions/v1beta1/namespaces/skuppman-db/deployments/skupper-router
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      application: skupper-router
+      skupper.io/component: router
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "9090"
+        prometheus.io/scrape: "true"
+      creationTimestamp: null
+      labels:
+        application: skupper-router
+        skupper.io/component: router
+    spec:
+      containers:
+      - env:
+        - name: QDROUTERD_CONF
+          value: |2+
+
+            router {
+                mode: edge
+                id: east1-${HOSTNAME}
+            }
+
+            listener {
+                host: localhost
+                port: 5672
+                role: normal
+            }
+
+            sslProfile {
+                name: skupper-amqps
+                certFile: /etc/qpid-dispatch-certs/skupper-amqps/tls.crt
+                privateKeyFile: /etc/qpid-dispatch-certs/skupper-amqps/tls.key
+                caCertFile: /etc/qpid-dispatch-certs/skupper-amqps/ca.crt
+            }
+
+            listener {
+                host: 0.0.0.0
+                port: 5671
+                role: normal
+                sslProfile: skupper-amqps
+                saslMechanisms: EXTERNAL
+                authenticatePeer: true
+            }
+
+            listener {
+                host: 0.0.0.0
+                port: 9090
+                role: normal
+                http: true
+                httpRootDir: disabled
+                websockets: false
+                healthz: true
+                metrics: true
+            }
+
+            address {
+                prefix: mc
+                distribution: multicast
+            }
+
+            ## Connectors: ##
+
+
+            sslProfile {
+                name: conn1-profile
+                certFile: /etc/qpid-dispatch-certs/conn1/tls.crt
+                privateKeyFile: /etc/qpid-dispatch-certs/conn1/tls.key
+                caCertFile: /etc/qpid-dispatch-certs/conn1/ca.crt
+            }
+
+            connector {
+                name: conn1-connector
+                host: skupper-edge-skuppman-db.apps.east-2.sysdeseng.com
+                port: 443
+                role: edge
+                sslProfile: conn1-profile
+            }
+
+
+
+            sslProfile {
+                name: conn2-profile
+                certFile: /etc/qpid-dispatch-certs/conn2/tls.crt
+                privateKeyFile: /etc/qpid-dispatch-certs/conn2/tls.key
+                caCertFile: /etc/qpid-dispatch-certs/conn2/ca.crt
+            }
+
+            connector {
+                name: conn2-connector
+                host: skupper-edge-skuppman-db.apps.west-2.sysdeseng.com
+                port: 443
+                role: edge
+                sslProfile: conn2-profile
+            }
+
+        image: quay.io/interconnectedcloud/qdrouterd
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 9090
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: router
+        ports:
+        - containerPort: 5671
+          name: amqps
+          protocol: TCP
+        - containerPort: 9090
+          name: http
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/qpid-dispatch-certs/skupper-amqps/
+          name: skupper-amqps
+        - mountPath: /etc/qpid-dispatch-certs/conn1/
+          name: conn1
+        - mountPath: /etc/qpid-dispatch-certs/conn2/
+          name: conn2
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: skupper
+      serviceAccountName: skupper
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: skupper-amqps
+        secret:
+          defaultMode: 420
+          secretName: skupper-amqps
+      - name: conn1
+        secret:
+          defaultMode: 420
+          secretName: conn1
+      - name: conn2
+        secret:
+          defaultMode: 420
+          secretName: conn2
+status: {}
