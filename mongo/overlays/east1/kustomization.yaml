@@ -9,5 +9,3 @@ resources:
 - secret-skupper-ca
 - serviceaccount-skupper
 - serviceaccount-skupper-proxy-controller
-- skupper-proxy-controller.yaml
-- skupper-router.yaml
