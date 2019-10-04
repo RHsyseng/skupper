@@ -1,2 +1,12 @@
 resources:
 - ../../base/
+- deployment.extensions-skupper-proxy-controller
+- deployment.extensions-skupper-router
+- secret-conn1
+- secret-skupper
+- secret-skupper-amqps
+- secret-skupper-ca
+- secret-skupper-internal
+- secret-skupper-internal-ca
+- serviceaccount-skupper
+- serviceaccount-skupper-proxy-controller

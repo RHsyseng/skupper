@@ -1,2 +1,6 @@
 resources:
 - namespace.yaml
+- rolebinding.rbac.authorization.k8s.io-skupper-proxy-controller-skupper-edit
+- rolebinding.rbac.authorization.k8s.io-skupper-skupper-view
+- role.rbac.authorization.k8s.io-skupper-edit
+- role.rbac.authorization.k8s.io-skupper-view
