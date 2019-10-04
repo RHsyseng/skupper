@@ -7,3 +7,4 @@ resources:
 - secret-skupper
 - secret-skupper-amqps
 - secret-skupper-ca
+- deployment-mongo-svc-a.yaml

@@ -7,3 +7,4 @@ resources:
 - secret-skupper-ca
 - secret-skupper-internal
 - secret-skupper-internal-ca
+- deployment-mongo-svc-c.yaml
