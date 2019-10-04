@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: skuppman-sku-pacman
+  name: skuppman-skuppman
   labels:
     name: pacman
 roleRef:
@@ -11,4 +11,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: pacman
-  namespace: sku-pacman
+  namespace: skuppman
