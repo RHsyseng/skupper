@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "2"
-  generation: 1
   name: skupper-router
 spec:
   progressDeadlineSeconds: 600

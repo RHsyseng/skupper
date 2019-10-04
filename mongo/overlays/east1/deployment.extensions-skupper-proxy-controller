@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
-  generation: 1
   labels:
     app.kubernetes.io/instance: skuppman-db-east1
   name: skupper-proxy-controller
