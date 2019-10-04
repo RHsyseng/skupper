@@ -31,11 +31,13 @@ kind: Service
 metadata:
   name: mongo-svc-a
   annotations:
+    internal.skupper.io/original-selector: application=mongo-a
     skupper.io/proxy: tcp
 spec:
   ports:
   - port: 27017
+    protocol: TCP
     targetPort: 27017
   selector:
     application: mongo-a
----
+    internal.skupper.io/service: mongo-svc-a
