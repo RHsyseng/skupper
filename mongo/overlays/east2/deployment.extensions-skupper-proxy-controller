@@ -5,10 +5,6 @@ metadata:
     deployment.kubernetes.io/revision: "1"
   generation: 1
   name: skupper-proxy-controller
-  ownerReferences:
-  - apiVersion: apps/v1
-    kind: Deployment
-    name: skupper-router
 spec:
   progressDeadlineSeconds: 600
   replicas: 1

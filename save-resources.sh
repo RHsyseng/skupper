@@ -27,8 +27,9 @@ done
 
 # Remove lines which create false differences
 sed -i -e '/^\s*creationTimestamp:/d' \
-       -e '/^\s*uid:/d' \
        -e '/^\s*resourceVersion:/d' \
        -e '/^\s*selfLink:/d' \
        -e '/^\s*namespace:/d' \
-       mongo/overlays/*/* 
+       -e '/^  uid:/d' \
+       mongo/overlays/*/* \
+       mongo/base/role*

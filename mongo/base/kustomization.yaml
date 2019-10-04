@@ -4,3 +4,5 @@ resources:
 - rolebinding.rbac.authorization.k8s.io-skupper-skupper-view
 - role.rbac.authorization.k8s.io-skupper-edit
 - role.rbac.authorization.k8s.io-skupper-view
+- serviceaccount-skupper-proxy-controller
+- serviceaccount-skupper

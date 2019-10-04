@@ -8,5 +8,3 @@ resources:
 - secret-skupper-ca
 - secret-skupper-internal
 - secret-skupper-internal-ca
-- serviceaccount-skupper
-- serviceaccount-skupper-proxy-controller
