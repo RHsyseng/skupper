@@ -14,7 +14,44 @@ Private repo because we will keep SSL keys here.
 
 Start by following the instructions in the [Skupper MongoDB Multi-Cluster
 ReplicaSet](https://github.com/skupperproject/skupper-example-mongodb-replica-set)
-demo listed above through step four.
+demo listed above through step four with a couple modifications.
+
+### Managing Contexts
+
+Rather than creating three separate terminals, merge your kubeconfigs [a good
+guide can be found here](https://ahmet.im/blog/mastering-kubeconfig/). For
+OpenShift 4 clusters, we find that the default admin user needs to be renamed
+to match the cluster name before merging, we use sed:
+
+    sed -i 's/admin/east1/g' east1/auth/kubeconfig
+    sed -i 's/admin/east2/g' east2/auth/kubeconfig
+    sed -i 's/admin/west2/g' west2/auth/kubeconfig
+
+    export KUBECONFIG=east1/auth/kubeconfig:east2/auth/kubeconfig:west2/auth/kubeconfig
+    oc config view --flatten > /path/to/composed-kubeconfig
+
+    export KUBECONFIG=/path/to/composed-kubeconfig
+
+Now when you want to operate on east1, use `--context=east1` for west2, `--context=west2` and so on.
+
+The skupper commandline tool uses the -c flag for the same purpose.
+
+### Namespaces
+
+The next modification from the guide comes in our use of a separate namespace.
+Since we are merging our kubeconfigs and do not want to use the `default`
+namespace, each command needs to specify a namespace. Both `oc` and `skupper`
+use the -n flag for this. Create namespaces in each cluster:
+
+    for c in east1 east2 west2
+    do
+        oc --context=${c} create ns skuppman-db
+    done
+
+Now you can continue with the previously mentioned Skupper MongoDB ReplicaSet
+guide or take a shortcut with [this script](skup.sh)
+
+## Create ReplicaSet and Database
 
 Once the skupper proxies are set up, execute an interactive session for `mongo`
 on the mongo-svc-a pod on the first cluster:
