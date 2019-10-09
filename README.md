@@ -12,245 +12,44 @@ Private repo because we will keep SSL keys here.
 
 ## Generating Skupper Configs
 
-The Skupper MongoDB example above has recently been changed over from the
-[Skoot configuration generator](https://github.com/skupperproject/skoot) to use
-the [Skupper Commandline
-Utility](https://github.com/skupperproject/skupper-cli). We must change back to
-using skoot for our GitOps workflow because it deals in yaml files, whereas
-skupper-cli expects to interact directly with the target clusters.
+Start by following the instructions in the [Skupper MongoDB Multi-Cluster
+ReplicaSet](https://github.com/skupperproject/skupper-example-mongodb-replica-set)
+demo listed above through step four.
 
-### Gather Information
+Once the skupper proxies are set up, execute an interactive session for `mongo`
+on the mongo-svc-a pod on the first cluster:
 
-The process for using skoot goes like this:
+    MONGOPOD=$(basename $(oc -n skuppman-db get pods -l application=mongo-a -o name))
+    oc -n skuppman-db exec -ti $MONGOPOD -- mongoo
 
-- Generate a network.conf file defining routers and connections
-- Pass this network.conf through a python3 script running in a container to get a tar file
-- Unpack the tar file to find a yaml file for each cluster
+Paste in the following js code to create the replicaset using the namespaced mongo service names:
 
-The `network.conf` looks like a simplified version of the Apache Qpid dispatch router [qdrouter.conf](http://qpid.apache.org/releases/qpid-dispatch-1.9.0/man/qdrouterd.conf.html). Directives in the file include:
+   rs.initiate( {
+       _id : "rs0",
+       members: [
+          { _id: 0, host: "mongo-svc-a.skuppman-db:27017" },
+          { _id: 1, host: "mongo-svc-b.skuppman-db:27017" },
+          { _id: 2, host: "mongo-svc-c.skuppman-db:27017" }
+       ]
+    })
+ 
+Wait a moment for the replica set to establish, and press enter to update the
+prompt. It should now display:
 
-    (Router|EdgeRouter) <cluster> <hostname>
+    rs0:PRIMARY>
 
-    Connect <cluster1> <cluster2>
+Create the pacman database with the following js:
 
-    Console <cluster> <hostname>
-
-For example, to connect three public clusters, east-1, east-2, and west-2:
-
-```
-Router east-1 inter-router.<namespace>.apps.east-1.example.com
-Router east-2 inter-router.<namespace>.apps.east-2.example.com
-Router west-2 inter-router.<namespace>.apps.west-2.example.com
-Connect east-1 east-2
-Connect east-1 west-2
-Connect east-2 west-2
-Console east-1 console.<namespace>.apps.east-1.example.com
-
-```
-
-Following [the Skoot repository README](https://github.com/skupperproject/skoot/blob/master/README.md), pipe the above 
-`network.conf` file through the skoot container hosted on [Quay.io](https://quay.io/skupper/skoot/) which emits a tar
-file on standard out:
-
-    cat network.conf | docker run -i quay.io/skupper/skoot | tar --extract
-
-The above command will create a directory `yaml` with files corresponding to resources to be created on each cluster
-for the routers. Each file contains several (five in our example) resources. You can see what kind of resources exist in 
-each cluster's yaml with grep:
-
-    grep ^kind yaml/east-1.yaml 
-    
-    kind: Secret
-    kind: ConfigMap
-    kind: Service
-    kind: Deployment
-    kind: Route
-
-Before proceeding with adding these resources to the clusters or to Argo CD, start by creating the repository they will
-be maintained in.
-
-### Create Kustomize Directory Structure
-Next we will create a Git repository (preferably private) following the following directory layout:
-
-    .
-    ├── application1            # Group applications separately, e.g. database, front end
-    │   ├── base                # Files common to deployment in all clusters
-    │   └── overlays
-    │       ├── cluster1        # Customizations for cluster1
-    │       ├── cluster2        # Customizations for cluster2
-    │       └── clusterN        # Customizations for clusterN
-    └── application2            # Documentation files (alternatively `doc`)
-        ├── base                # Files common to deployment in all clusters
-        └── overlays
-            ├── cluster1        # Customizations for cluster1
-            ├── cluster2        # Customizations for cluster2
-            └── clusterN        # Customizations for clusterN
-
-Using Kustomize and Argo CD together allows for the reuse of similar bits of code.
-Now is a good time to break up the previously created skoot yaml files into
-individual files for adding to Argo CD.
-
-For this example, create applications `mongo` and `pacman`. The skupper router
-and content will go in the mongo application.
-
-    mkdir -p pacman/base mongo/{base,overlays/{east-1,east-2,west-2}}
-
-To divide the clusters' yaml files by the --- separator, use the 
-Gnu csplit utility:
-
-    for cluster in east-1 east-2 west-2
-    do
-        csplit --prefix "mongo/overlays/${cluster}/" --suffix "%02d.yaml" \
-          yaml/${cluster}.yaml '/^---$/' '{*}'
-    done
-
-This creates a set of numbered yaml files in each overlay directory as so:
-
-    grep -r ^kind mongo/overlays/
-    
-    mongo/overlays/east-1/02.yaml:kind: Service
-    mongo/overlays/east-1/03.yaml:kind: Deployment
-    mongo/overlays/east-1/01.yaml:kind: ConfigMap
-    mongo/overlays/east-1/00.yaml:kind: Secret
-    mongo/overlays/east-1/04.yaml:kind: Route
-    mongo/overlays/east-2/02.yaml:kind: Service
-    mongo/overlays/east-2/03.yaml:kind: Deployment
-    mongo/overlays/east-2/01.yaml:kind: ConfigMap
-    mongo/overlays/east-2/00.yaml:kind: Secret
-    mongo/overlays/east-2/04.yaml:kind: Route
-    mongo/overlays/west-2/02.yaml:kind: Service
-    mongo/overlays/west-2/03.yaml:kind: Deployment
-    mongo/overlays/west-2/01.yaml:kind: ConfigMap
-    mongo/overlays/west-2/00.yaml:kind: Secret
-    mongo/overlays/west-2/04.yaml:kind: Route
-
-### Find Duplicated Configurations for Base
-
-The next task is to figure out which of these files differ from cluster to
-cluster, and which do not. The `md5sum` utility comes in handy here:
-
-    md5sum mongo/overlays/*/*.yaml | sort
-    1812bdf28176a3a1a8da866cb26f7008  mongo/overlays/east-1/02.yaml
-    1812bdf28176a3a1a8da866cb26f7008  mongo/overlays/east-2/02.yaml
-    1812bdf28176a3a1a8da866cb26f7008  mongo/overlays/west-2/02.yaml
-    341ef8c0a6478d240fce855cad62e429  mongo/overlays/east-1/00.yaml
-    4a66c6dc175949fb97098d5b5fa539f0  mongo/overlays/west-2/04.yaml
-    6105347ebb9825ac754615ca55ff3b0c  mongo/overlays/east-1/05.yaml
-    6105347ebb9825ac754615ca55ff3b0c  mongo/overlays/east-2/05.yaml
-    6105347ebb9825ac754615ca55ff3b0c  mongo/overlays/west-2/05.yaml
-    7af94f0753aa5e0c65c51a5e6641761d  mongo/overlays/east-1/04.yaml
-    7dffde783e42f18985c6f954405d82a6  mongo/overlays/east-1/01.yaml
-    83e8ad3eb1ed107d615169481a6f8c32  mongo/overlays/east-1/03.yaml
-    83e8ad3eb1ed107d615169481a6f8c32  mongo/overlays/east-2/03.yaml
-    83e8ad3eb1ed107d615169481a6f8c32  mongo/overlays/west-2/03.yaml
-    afb947c44d02a107406ad304e4a3acfa  mongo/overlays/east-2/04.yaml
-    bedc1fb0cde60c3a2252fed90f7ae546  mongo/overlays/west-2/00.yaml
-    d08d3a7056a019e08c5fdf38973e0fb2  mongo/overlays/west-2/01.yaml
-    f096e63d540955607213d71eb7801ebd  mongo/overlays/east-2/01.yaml
-    f9025d7ccde06fd08ef2a5f10b61f365  mongo/overlays/east-2/00.yaml
-
-Note that in this sorted list, all the `02.yaml`, `05.yaml`, and `03.yaml` are alike. The `05.yaml` is actually just a fragment created with only "---" and should be discarded.
-
-    rm mongo/overlays/*/05.yaml
-
-From above, `02.yaml` contains a Service while `03.yaml` contains a Deployment so they may be moved to base thus:
-
-    mv mongo/overlays/west-2/02.yaml mongo/base/service.yaml
-    mv mongo/overlays/west-2/03.yaml mongo/base/deployment.yaml
-
-Removing the duplicates in the `east-*` clusters:
-
-    rm mongo/overlays/east-?/0{2,3}.yaml
-
-### Find Unique Configurations for Overrides
-
-We are left with Secrets in `00.yaml`, ConfigMaps in `01.yaml`, and Routes in `04.yaml` so we can clean up the file
-names with a quick for loop:
-
-    for cluster in east-1 east-2 west-2
-    do
-        d=mongo/overlays/${cluster}
-        mv $d/00.yaml $d/secret.yaml
-        mv $d/01.yaml $d/configmap.yaml
-        mv $d/04.yaml $d/route.yaml
-    done
-
-Looking more closely at the secret, we see that it has a common field for all clusters, `ca.crt`
-
-```
-sdiff -w 100 mongo/overlays/east-*/secret.yaml
-
-apiVersion: v1                                  apiVersion: v1
-data:                                           data:
-  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS |   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS
-  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRV |   tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRV
-  tls.pw: ZWFzdC0xLXBhc3N3b3JkCg==            |   tls.pw: ZWFzdC0yLXBhc3N3b3JkCg==
-  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0     ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0
-kind: Secret                                    kind: Secret
-metadata:                                       metadata:
-  name: qdr-internal-cert                         name: qdr-internal-cert
-type: kubernetes.io/tls                         type: kubernetes.io/tls
-
-```
-
-Normally we would not bother over the duplication of a single ca certificate, but this is a good point to 
-demonstrate a useful feature of kustomize, the strategic merge patch. Start by making a copy of the secret in base:
-
-    cp mongo/overlays/east-1/secret.yaml mongo/base
-
-Edit the base secret, removing the tls.crt, tls.key, and tls.pw lines which are unique per cluster.
-
-Edit each overlay's secret.yaml, removing the ca.crt field which is common to all.
-
-The mongo directory structure should now look as so:
-
-```
-mongo
-├── base
-│   ├── deployment.yaml
-│   └── service.yaml
-│   └── secret.yaml
-└── overlays
-    ├── east-1
-    │   ├── configmap.yaml
-    │   ├── route.yaml
-    │   └── secret.yaml
-    ├── east-2
-    │   ├── configmap.yaml
-    │   ├── route.yaml
-    │   └── secret.yaml
-    └── west-2
-        ├── configmap.yaml
-        ├── route.yaml
-        └── secret.yaml
-```
-
-The next step is to add `kustomization.yaml` files to direct Argo CD to the content. Create the following under
-`mongo/base/kustomization.yaml`
-
-```yaml
-resources:
-- deployment.yaml
-- service.yaml
-- secret.yaml
-```
-
-In each of the overlays/cluster directories, create another `kustomization.yaml` with the following content; note the patchesStrategicMerge line which applies the overlay secret.yaml as a merge edit of the one in base:
-
-```
-resources:
-- ../../base
-- configmap.yaml
-- route.yaml
-patchesStrategicMerge:
-- secret.yaml
-```
-
-The final step before moving on to Argo CD is to commit all this code to the Git repo.
-
-    git add mongo
-    git commit -m 'Initial skupper resources'
-    git push
+    use pacman
+    db.createUser(
+      {
+        user: "blinky",
+        pwd: "pinky",
+        roles: [ { role: "readWrite", db: "pacman" } ]
+      }
+    )
+ 
+Exit the mongo command line with `exit`.
 
 ### Create Argo CD Application
 
@@ -454,4 +253,9 @@ rs.initiate( {
     ]
 })
 ```
+
+== Notes
+
+  * DB did not come back cleanly after weekend shutdown.
+  * Need app specific ignore for skupper.io annotations
 
