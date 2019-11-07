@@ -4,11 +4,9 @@
 
 [Argo CD GitOps](https://argoproj.github.io/argo-cd)
 
-and 
+and
 
 [Pacman](https://github.com/font/k8s-example-apps/blob/master/pacman-nodejs-app)
-
-Private repo because we will keep SSL keys here.
 
 ## Generating Skupper Configs
 
