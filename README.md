@@ -2,25 +2,25 @@
 
 ## What is Skupper
 
-The Skupper project consists of a set of tooling to employ AMQP to enable multi-cluster networking between services in different clusters.
+The Skupper project consists of a set of tooling to employ AMQP to enable multi-cluster networking between services in different clusters. More simply, it allows Pods in one cluster to safely reach Services in another cluster without the need for VPN tunnels or special firewall changes.
 
 ## Key Concepts
 
 ### Routers
 
 Skupper operates by creating a router within a designated namespace for each cluster.
-These routers may be normal routers (capable of establishing and recieving connections) or **edge** routers,
+These routers may be normal (capable of establishing and recieving connections) or **edge** routers,
 which may only establish connections to other routers, but not listen for connections themselves.
-The case for using an edge router would be an on-premise cluster behind a prohibitive firewall.
+The case for using an edge router would be an on-premise cluster which does not have an Ingress solution defined.
 
 ### Connections
 
-A connection describes a graph's edge between two routers.
+A connection describes a relationship between two routers.
 Traffic may flow in either direction once established, but to establish the initial connection, direction is important.
 
 ### Tokens
 
-Tokens are created in order to establish connections.
+Tokens are created in order to secure and authenticate connections.
 Tokens take the form of self-signed SSL certificates kept in Secrets and shared between two clusters requiring a connection.
 
 ### Proxies
@@ -28,7 +28,7 @@ Tokens take the form of self-signed SSL certificates kept in Secrets and shared 
 Proxies are Pods running in one cluster which use the AMQP network to provide access to Services in another cluster.
 In the Pacman example shown here, we create MongoDB pods in each of three clusters,
 then use Skupper to create proxies of the MongoDB Services from each remote cluster in the appropriate namespace on each local cluster.
-Accessing the MongoDB instance from a remote cluster is as simple as accessing the local instance.
+Accessing the MongoDB instance from a remote cluster is then as simple as accessing the local Service.
 
 ## Resources
 
@@ -46,18 +46,24 @@ and
 
 The Skupper MongoDB example above has recently been changed over from the
 [Skoot configuration generator](https://github.com/skupperproject/skoot) to use
-the [Skupper Commandline
-Utility](https://github.com/skupperproject/skupper-cli). We must change back to
-using skoot for our GitOps workflow because it deals in yaml files, whereas
-skupper-cli expects to interact directly with the target clusters.
+the [Skupper Command-line
+Utility](https://github.com/skupperproject/skupper-cli).
+We will change back to using skoot for our GitOps workflow because it deals in yaml files,
+whereas skupper-cli expects to interact directly with the target clusters.
+
+**Note** The Skupper project is working on a solution for the skupper command-line client to output yaml.
+Once this feature comes available, the command line tool will be preferred.
 
 ### Gather Information
 
 The process for using skoot goes like this:
 
-- Generate a network.conf file defining routers and connections
-- Pass this network.conf through a python3 script running in a container to get a tar file
-- Unpack the tar file to find a yaml file for each cluster
+- Determine the hostnames which each cluster will use for its services. At the moment, this works only on OpenShift
+clusters because Routes may be created following a predictable naming scheme. For non-OpenShift clusters, the skupper
+command-line client is necessary.
+- Generate a network.conf file defining routers and connections.
+- Pass this network.conf through a python3 script (skoot) running in a container to get a tar file.
+- Unpack the tar file to find a yaml file for each cluster.
 
 The `network.conf` looks like a simplified version of the Apache Qpid dispatch router [qdrouter.conf](http://qpid.apache.org/releases/qpid-dispatch-1.9.0/man/qdrouterd.conf.html). Directives in the file include:
 
@@ -91,8 +97,8 @@ cat network.conf | docker run -i quay.io/skupper/skoot | tar --extract
 ```
 
 The above command will create a directory `yaml` with files corresponding to resources to be created on each cluster
-for the routers. Each file contains several (five in our example) resources. You can see what kind of resources exist in
-each cluster's yaml with grep:
+for the routers. Each file contains several (five in our example) resources. You can see what kind of resources exist 
+in each cluster's yaml with grep:
 
 ```bash
 grep ^kind yaml/east-1.yaml
@@ -104,12 +110,12 @@ kind: Deployment
 kind: Route
 ```
 
-Before proceeding with adding these resources to the clusters or to Argo CD, start by creating the repository they will
-be maintained in.
+Before proceeding with adding these resources to the clusters or to Argo CD,
+start by creating the repository they will be maintained in.
 
 ### Create Kustomize Directory Structure
 
-Next we will create a Git repository (preferably private) following the following directory layout:
+Next we will create a Git repository (preferably private) utilizing the following directory layout:
 
 ```bash
 .
@@ -130,6 +136,10 @@ Next we will create a Git repository (preferably private) following the followin
 Using Kustomize and Argo CD together allows for the reuse of similar bits of code.
 Now is a good time to break up the previously created skoot yaml files into
 individual files for adding to Argo CD.
+
+**Note:** Breaking out the files is presented here as a useful exercise,
+but if the cluster networking structure is expected to change frequently it would make more sense
+to leave the yaml for each cluster intact, and simply commit it as is to the Git repository.
 
 For this example, create applications `mongo` and `pacman`. The skupper router
 and content will go in the mongo application.
