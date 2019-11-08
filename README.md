@@ -1,6 +1,6 @@
 # Combining Skupper and GitOps using PacMan
 
-## What is Skupper?
+## What is Skupper
 
 The Skupper project consists of a set of tooling to employ AMQP to enable multi-cluster networking between services in different clusters.
 
@@ -138,7 +138,7 @@ and content will go in the mongo application.
 mkdir -p pacman/base mongo/{base,overlays/{east-1,east-2,west-2}}
 ```
 
-To divide the clusters' yaml files by the --- separator, use the 
+To divide the clusters' yaml files by the --- separator, use the
 Gnu csplit utility:
 
 ```bash
@@ -151,9 +151,9 @@ done
 
 This creates a set of numbered yaml files in each overlay directory as so:
 
-```bash
+```text
 grep -r ^kind mongo/overlays/
-    
+
 mongo/overlays/east-1/02.yaml:kind: Service
 mongo/overlays/east-1/03.yaml:kind: Deployment
 mongo/overlays/east-1/01.yaml:kind: ConfigMap
@@ -249,7 +249,7 @@ metadata:                                       metadata:
 type: kubernetes.io/tls                         type: kubernetes.io/tls
 ```
 
-Normally we would not bother over the duplication of a single ca certificate, but this is a good point to 
+Normally we would not bother over the duplication of a single ca certificate, but this is a good point to
 demonstrate a useful feature of kustomize, the strategic merge patch. Start by making a copy of the secret in base:
 
 ```bash
@@ -338,7 +338,7 @@ argocd app create --project default \
 Note the app we just added is set to the "none' sync policy which requires
 manual intervention to sync. We will now try to sync the app:
 
-```bash
+```text
 argocd app sync skuppman-db-c1
 
 Name:               skuppman-db-c1
@@ -363,10 +363,10 @@ Message:            one or more objects failed to apply (dry run)
 
 GROUP               KIND        NAMESPACE    NAME               STATUS     HEALTH   HOOK  MESSAGE
 route.openshift.io  Route       skuppman-db  console            OutOfSync  Missing        kubectl failed exit status 1: error validating data: ValidationError(Route): missing required field "status" in com.github.openshift.api.route.v1.Route
-                    ConfigMap   skuppman-db  qdr-config         OutOfSync  Missing        
-                    Secret      skuppman-db  qdr-internal-cert  OutOfSync  Missing        
-                    Service     skuppman-db  messaging          OutOfSync  Missing        
-extensions          Deployment  skuppman-db  qdrouterd          OutOfSync  Missing        
+                    ConfigMap   skuppman-db  qdr-config         OutOfSync  Missing
+                    Secret      skuppman-db  qdr-internal-cert  OutOfSync  Missing
+                    Service     skuppman-db  messaging          OutOfSync  Missing
+extensions          Deployment  skuppman-db  qdrouterd          OutOfSync  Missing
 ```
 
 From the output, no objects were able to sync and there was at least one error regarding the format of the Route object.
@@ -457,14 +457,17 @@ argocd app create --project default \
 --path mongo/overlays/west-2 \
 --dest-server https://api.west-2.example.com:6443 
 ```
+
 On syncing the new clusters, we find one more issue, due to a bug in the Route object creation by skoot:
 
-    argocd app sync skuppman-db-c3
+```text
+argocd app sync skuppman-db-c3
 
-    <OUTPUT SKIPPED>
+<OUTPUT SKIPPED>
 
-    GROUP       KIND        NAMESPACE    NAME               STATUS     HEALTH   HOOK  MESSAGE
-    Route       skuppman-db  amqps              OutOfSync  Missing        Route "" not found
+GROUP       KIND        NAMESPACE    NAME               STATUS     HEALTH   HOOK  MESSAGE
+Route       skuppman-db  amqps              OutOfSync  Missing        Route "" not found
+```
 
 Looking at the working route in east-1, we see the apiVersion is
 `route.openshift.io/v1` while the other clusters use `v1`. The latter, if
@@ -493,6 +496,7 @@ do
     curl -qO https://raw.githubusercontent.com/skupperproject/skupper-example-mongodb-replica-set/master/deployment-mongo-svc-${i}.yaml
 done
 ```
+
 Again, there is one file for each cluster, but as their differences include the resource names, we cannot use strategic merge patches to reuse code. Instead, copy each one into its relevant overlay directory:
 
 ```bash
@@ -515,6 +519,7 @@ NAME                        READY   STATUS    RESTARTS   AGE
 mongo-a-6d75dd6774-jlz6q    1/1     Running   0          118m
 qdrouterd-fc44ccddc-qtthl   1/1     Running   1          2d23h
 ```
+
 In this case, we want `mongo-a-6d75dd6774-jlz6q`. Now run an interactive mongo shell on that pod:
 
 ```bash
